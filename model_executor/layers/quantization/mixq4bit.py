@@ -260,14 +260,16 @@ class MixQLinear4bitMethod(LinearMethodBase):
             reshaped_x = x.reshape(-1, x.shape[-1])
 
             # num_tokens >= threshold
-            FP16_MATMUL_HEURISTIC_CONDITION = x.shape[:-1].numel() >= 256
+            # FP16_MATMUL_HEURISTIC_CONDITION = x.shape[:-1].numel() >= 256
 
-            if FP16_MATMUL_HEURISTIC_CONDITION:
-                out = ops.awq_dequantize(qweight, scales, qzeros, 0, 0, 0)
-                out = torch.matmul(reshaped_x, out)
-            else:
-                out = ops.awq_gemm(reshaped_x, qweight, scales, qzeros,
-                                pack_factor)
+            # if FP16_MATMUL_HEURISTIC_CONDITION:
+            #     out = ops.awq_dequantize(qweight, scales, qzeros, 0, 0, 0)
+            #     out = torch.matmul(reshaped_x, out)
+            # else:
+        
+            #print(reshaped_x.shape)
+            out = ops.awq_gemm(reshaped_x, qweight, scales, qzeros,
+                            pack_factor)
             if bias is not None:
                 out.add_(bias)
             return out.reshape(out_shape)
