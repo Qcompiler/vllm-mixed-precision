@@ -25,7 +25,8 @@ AWQ finished the task in 127 seconds with  5.2 it/s.
 
 <img src="figures/awq512.gif">
 
-MixQ (W8A8O16) finished the task in 42 seconds with 15.36 it/s by running 
+MixQ (W8A8O16) finished the task in 30 seconds with 21.34 it/s by running 
+
 ``` python evalppl.py --model_type mix8 --model_path /home/cyd/mixqdata/quant8/Llama-2-7b --quant_file /home/cyd/mixqdata/quant8/Llama-2-7b --n_ctx 512 --n_batch 512 --eval_accuracy True```
 
 <img src="figures/mixq512.gif">
