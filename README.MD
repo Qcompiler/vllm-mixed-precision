@@ -25,8 +25,7 @@ AWQ finished the task in 127 seconds with  5.2 it/s.
 
 <img src="figures/awq512.gif">
 
-MixQ (W8A8O16) finished the task in 30 seconds with 21.34 it/s by running 
-
+MixQ (W8A8O16) finished the task in 42 seconds with 15.36 it/s by running 
 ``` python evalppl.py --model_type mix8 --model_path /home/cyd/mixqdata/quant8/Llama-2-7b --quant_file /home/cyd/mixqdata/quant8/Llama-2-7b --n_ctx 512 --n_batch 512 --eval_accuracy True```
 
 <img src="figures/mixq512.gif">
@@ -38,15 +37,6 @@ Please quantized the model by the QComplier (https://github.com/Qcompiler/QCompl
 ```
 git clone  git@github.com:Qcompiler/QComplier.git
 
-```
-
-Build the kernel by
-
-```
-cd EETQ
-python setup.py install
-cd quantkernel
-python setup.py install
 ```
 
 
@@ -66,7 +56,7 @@ git clone git@github.com:Qcompiler/vllm-mixed-precision.git
 And copy the ".so" from the vllm project
 
 ```
-cp -r $PYTHON_PATH/lib/python3.11/site-packages/vllm/*.so  vllm-mixed-precision/*
+cp -r $PYTHON_PATH/lib/python3.11/site-packages/vllm/*.so  vllm-mixed-precision/vllm/
 ```
 
 Delete the vllm==0.6.2
@@ -75,49 +65,17 @@ pip uninstall vllm
 ```
 
 
-## Quant the 8bit and 4bit mixed-precsion LLMs
-
-### Setup
-
-build the kernel by
-```
-cd EETQ
-python setup.py install
-
-cd quantkernel
-python setup.py install
-```
-
-### Quantize the 8-bit and 4-bit mixed-precision LLMs
-
-### Download the ``` val.jsonl.zst``` from
-
-https://huggingface.co/datasets/mit-han-lab/pile-val-backup/blob/main/val.jsonl.zst
-
-### generate the act_scales by smoothquant
-
-python examples/smooth_quant_get_act.py  --model-name /dev/shm/tmp/${model}  \
-        --output-path ${base}/act_scales/${model}.pt  --dataset-path /home/cyd/val.jsonl.zst 
-
-### Quantize the Model
-
-```
-bash quant.sh
-```
-or
-```
-export bit=8
-python examples/basic_quant_mix.py  \
-            --model_path ${path}/${model} \
-            --quant_file ${path}/quant${bit}/${model} --w_bit ${bit}
-```
 
 ## Runing 8-bit mixed-preiciosn infernce in vllm
 
 ```
-python examples/test8bit.py --quant 8
+export PYTHONPATH=$( pwd )
+python test8bit.py --quant 8
 ```
 
+The output is 
+
+<img src="figures/output.png">
 
 <!-- ## Runing 4-bit mixed-preiciosn infernce in vllm
 
