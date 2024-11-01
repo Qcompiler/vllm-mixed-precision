@@ -17,13 +17,14 @@ sampling_params = SamplingParams(temperature=0.8, top_p=0.95,max_tokens=128)
 import os
 
 # please use Qcompiler to quant model !
-
-os.system("rm /dev/shm/tmp/quant8/chatglm/chatglm2-6b/*.safetensors")
+model = "chatglm3-6b"
+base =  "/home/chenyidong/data/mixqdata"
+os.system("rm " + model + "/*.safetensors")
 # 删除量化后的tonken chatglm https://github.com/THUDM/ChatGLM3/issues/152
-os.system("rm /dev/shm/tmp/quant8/chatglm/chatglm2-6b/tokenizer*")
-os.system("cp -r /dev/shm/tmp/chatglm/chatglm2-6b/tokenizer*   /dev/shm/tmp/quant8/chatglm/chatglm2-6b/")
+# os.system("rm" + model + "/tokenizer*")
+# os.system("cp -r" + model + "/tokenizer*  " + model + "/chatglm3-6b/")
 
-llm = LLM(model="/dev/shm/tmp/quant8/chatglm/chatglm2-6b", trust_remote_code=True,
+llm = LLM(model= base + "/quant8/"+ model, trust_remote_code=True,
         quantization="MixQ8bit", max_num_seqs=128)
 # Generate texts from the prompts. The output is a list of RequestOutput objects
 # that contain the prompt, generated text, and other information.

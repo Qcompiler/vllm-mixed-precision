@@ -246,6 +246,7 @@ class FalconDecoderLayer(nn.Module):
         self.mlp = FalconMLP(config, quant_config)
         self.config = config
 
+        config.num_ln_in_parallel_attn = 1
         if (config.num_ln_in_parallel_attn is None
                 and config.new_decoder_architecture):
             config.num_ln_in_parallel_attn = 2

@@ -31,14 +31,14 @@ elif args.quant == "4":
     model_dir = os.path.join(args.model_dir,"quant4")
     quantization = "MixQ4bit"    
 elif args.quant == "awq":
-    model_dir =  args.model_dir+"-AWQ"
+    model_dir =  args.model_dir 
     quantization = "AWQ"    
 else:
     model_dir = args.model_dir
     quantization = None
 # Generate texts from the prompts. The output is a list of RequestOutput objects
 # that contain the prompt, generated text, and other information.
-model_dir = os.path.join(model_dir,args.model)
+
 sampling_params = SamplingParams(temperature=0.8, top_p=0.95,max_tokens=128)
 
 llm = LLM(model=model_dir, trust_remote_code=True,

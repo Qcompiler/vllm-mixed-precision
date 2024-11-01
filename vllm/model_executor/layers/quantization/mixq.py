@@ -58,7 +58,8 @@ class MixQConfig(QuantizationConfig):
     def get_quant_method(
             self, layer: torch.nn.Module, prefix: str) -> Optional["MixQLinearMethod"]:
         if isinstance(layer, LinearBase):
-            #print("--get_quant_method---")
+            print("--get_quant_method---")
+            print(layer.name)
             if layer.name is not None and "down" in layer.name:
                 return MixQLinearMethod(self, weight_only = True)
             return MixQLinearMethod(self)
