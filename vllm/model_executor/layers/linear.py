@@ -157,10 +157,8 @@ class LinearBase(torch.nn.Module):
         prefix: str = "", name: Optional[str] = None,
     ):
         super().__init__()
-        if name is not None:
-            self.name = name
-        else:
-            self.name = "none existence"
+        assert prefix is not None
+        self.prefix = prefix
         # Keep input parameters
         self.input_size = input_size
         self.output_size = output_size
@@ -285,7 +283,7 @@ class ColumnParallelLinear(LinearBase):
                  output_sizes: Optional[List[int]] = None,
                  prefix: str = "", name: Optional[str] = None):
         super().__init__(input_size, output_size, skip_bias_add, params_dtype,
-                         quant_config, prefix,name)
+                         quant_config, prefix, name)
         self.name = name
         self.gather_output = gather_output
 
@@ -660,6 +658,7 @@ class QKVParallelLinear(ColumnParallelLinear):
                  quant_config: Optional[QuantizationConfig] = None,
                  prefix: str = "",name: Optional[str] = None):
         self.name = name
+        self.prefix = prefix
         self.hidden_size = hidden_size
         self.head_size = head_size
         self.total_num_heads = total_num_heads
@@ -1042,8 +1041,8 @@ class RowParallelLinear(LinearBase):
         if len(loaded_weight.shape) == 0:
             loaded_weight = loaded_weight.reshape(1)
 
-        print(param_data.shape)
-        print(loaded_weight.shape)
+        # print(param_data.shape)
+        # print(loaded_weight.shape)
         
         assert param_data.shape == loaded_weight.shape
         param_data.copy_(loaded_weight)

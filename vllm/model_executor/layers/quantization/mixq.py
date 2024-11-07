@@ -18,11 +18,10 @@ class MixQConfig(QuantizationConfig):
 
     def __init__(
         self,
-        weight_bits: int,
-        group_size: int,
+        weight_bits: int
     ) -> None:
         self.weight_bits = weight_bits
-        self.group_size = group_size
+        # self.group_size = group_size
         
 
     def __repr__(self) -> str:
@@ -49,18 +48,18 @@ class MixQConfig(QuantizationConfig):
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "MixQConfig":
         weight_bits = cls.get_from_keys(config, ["w_bit", "bits"])
-        group_size = cls.get_from_keys(config, ["q_group_size", "group_size"])
+        # group_size = cls.get_from_keys(config, ["q_group_size", "group_size"])
         #print("mix------weight")
         #print(weight_bits)
         #print(group_size)
-        return cls(weight_bits, group_size)
+        return cls(weight_bits)
 
     def get_quant_method(
             self, layer: torch.nn.Module, prefix: str) -> Optional["MixQLinearMethod"]:
         if isinstance(layer, LinearBase):
             print("--get_quant_method---")
-            print(layer.name)
-            if layer.name is not None and "down" in layer.name:
+            print(layer.prefix)
+            if layer.prefix is not None and "down" in layer.prefix:
                 return MixQLinearMethod(self, weight_only = True)
             return MixQLinearMethod(self)
         return None
@@ -84,11 +83,13 @@ class MixQLinearMethod(LinearMethodBase):
                        output_partition_sizes: List[int], input_size: int,
                        output_size: int, params_dtype: torch.dtype,
                        **extra_weight_attrs):
-        if input_size_per_partition % self.quant_config.group_size != 0:
-            raise ValueError(
-                "The input size is not aligned with the quantized "
-                "weight shape. This can be caused by too large "
-                "tensor parallel size.")
+        # print(self.quant_config.group_size)
+        # print(input_size_per_partition)
+        # if input_size_per_partition % self.quant_config.group_size != 0:
+        #     raise ValueError(
+        #         "The input size is not aligned with the quantized "
+        #         "weight shape. This can be caused by too large "
+        #         "tensor parallel size.")
 
         output_size_per_partition = sum(output_partition_sizes)
 
@@ -205,41 +206,37 @@ class MixQLinearMethod(LinearMethodBase):
         N = layer.weight.shape[0]
         K = layer.weight.shape[1]
 
-        
-        # for compute bound 
-        if M > 64:
-            #print("call  weight act",M,N,K)
-            y1 = mixlib.mixgemmforward(M,N,K,
-                                x,
-                                layer.weight, 
-                                layer.scale_col,
-                                layer.weight_cache, #新增fp weight 
-                                layer.ind, #新增fp ind 
-                                layer.q_weight, #新增 int4 weight int32
-                                layer.q_scale_col)
-        else:
-             
-            #print("call  weight only",M,N,K)
+
+        if self.weight_only is True:
+
             y1 =  w8_a16_gemm(inputs,layer.q_weight,layer.q_scale_col)
+            # print('-------------')
+            # print(inputs)
+            # print(layer.q_weight)
+            # print(layer.q_scale_col)
+            # print(y1)
+            # print('-------------')
+            # if self.weight_only is True:
 
-        # tmp = torch.clone(inputs)
-        # activation_outliers = mixlib.ExtractOutliersAndSetToZeros(layer.ind, tmp)
-        
-        # x_scale = torch.zeros((M,1),dtype=torch.float16,device=inputs.device)
-        # q_xcache = mixlib.FindRowScale(tmp,x_scale, 
-        #                                     inputs.shape[0], 
-        #                                     layer.weight.shape[1],
-        #                                     8)  
-            
+            #     exit()
+        else:
+            # for compute bound 
+            if M > 64:
+                #print("call  weight act",M,N,K)
+                y1 = mixlib.mixgemmforward(M,N,K,
+                                    x,
+                                    layer.weight, 
+                                    layer.scale_col,
+                                    layer.weight_cache, #新增fp weight 
+                                    layer.ind, #新增fp ind 
+                                    layer.q_weight, #新增 int4 weight int32
+                                    layer.q_scale_col)
+            else:
+                
+                #print("call  weight only",M,N,K)
+                y1 =  w8_a16_gemm(inputs,layer.q_weight,layer.q_scale_col)
 
-        # outliers_fp16 = torch.mm( activation_outliers,  layer.weight_cache.T) 
-        
-        # y1 = mixlib.int8FusedDequantize(q_xcache, 
-        #                                  layer.weight, 
-        #                                  x_scale,
-        #                                  layer.scale_col,
-        #                                  outliers_fp16,
-        #                                  M,layer.weight.shape[0],layer.weight.shape[1])  
+
 
         if layer.bias is not None:
             y1 += layer.bias

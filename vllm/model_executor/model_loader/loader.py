@@ -401,7 +401,8 @@ class DefaultModelLoader(BaseModelLoader):
                                           scheduler_config)
 
             model.load_weights(self._get_all_weights(model_config, model))
-
+            # print(model.transformer.h[0].self_attention.query_key_value.weight)
+            # exit()
             for _, module in model.named_modules():
                 quant_method = getattr(module, "quant_method", None)
                 if quant_method is not None:
@@ -485,6 +486,7 @@ class TensorizerLoader(BaseModelLoader):
                                           lora_config, cache_config)
 
             model.load_weights(self._get_weights_iterator())
+
         return model.eval()
 
     def _load_model_serialized(

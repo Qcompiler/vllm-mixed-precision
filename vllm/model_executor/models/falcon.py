@@ -119,6 +119,7 @@ class FalconAttention(nn.Module):
             bias=config.bias,
             skip_bias_add=True,
             quant_config=quant_config,
+            prefix = "down"
         )
         self.q_size = self.num_heads * self.head_dim
         self.kv_size = self.num_kv_heads * self.head_dim
@@ -209,7 +210,7 @@ class FalconMLP(nn.Module):
                                                   bias=config.bias,
                                                   skip_bias_add=True,
                                                   quant_config=quant_config)
-        self.act = get_act_fn("gelu", quant_config, 4 * hidden_size)
+        self.act = get_act_fn("gelu", None, 4 * hidden_size)
         self.reduce_row_parallel_results = not (config.new_decoder_architecture
                                                 or config.parallel_attn)
         self.dense_4h_to_h = RowParallelLinear(
@@ -218,7 +219,7 @@ class FalconMLP(nn.Module):
             bias=config.bias,
             skip_bias_add=True,
             reduce_results=self.reduce_row_parallel_results,
-            quant_config=quant_config)
+            quant_config=quant_config, prefix= "down" )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # NOTE(zhuohan): Following huggingface, we do not fuse bias add here.
@@ -226,6 +227,7 @@ class FalconMLP(nn.Module):
         if bias is not None:
             x += bias
         x = self.act(x)
+
         x, bias = self.dense_4h_to_h(x)
         return x, bias
 
@@ -241,6 +243,7 @@ class FalconDecoderLayer(nn.Module):
         super().__init__()
         hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
+
         self.self_attention = FalconAttention(config, cache_config,
                                               quant_config)
         self.mlp = FalconMLP(config, quant_config)

@@ -17,8 +17,8 @@ from vllm.model_executor.layers.quantization.fbgemm_fp8 import FBGEMMFp8Config
 from vllm.model_executor.layers.quantization.fp8 import Fp8Config
 from vllm.model_executor.layers.quantization.gguf import GGUFConfig
 from vllm.model_executor.layers.quantization.gptq import GPTQConfig
-from vllm.model_executor.layers.quantization.gptq_marlin import (
-    GPTQMarlinConfig)
+# from vllm.model_executor.layers.quantization.gptq_marlin import (
+#     GPTQMarlinConfig)
 from vllm.model_executor.layers.quantization.gptq_marlin_24 import (
     GPTQMarlin24Config)
 from vllm.model_executor.layers.quantization.marlin import MarlinConfig
@@ -42,7 +42,7 @@ QUANTIZATION_METHODS: Dict[str, Type[QuantizationConfig]] = {
     "marlin": MarlinConfig,
     "gguf": GGUFConfig,
     "gptq_marlin_24": GPTQMarlin24Config,
-    "gptq_marlin": GPTQMarlinConfig,
+    # "gptq_marlin": GPTQMarlinConfig,
     "awq_marlin": AWQMarlinConfig,
     "gptq": GPTQConfig,
     "compressed-tensors": CompressedTensorsConfig,

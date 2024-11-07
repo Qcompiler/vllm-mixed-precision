@@ -22,7 +22,8 @@ from vllm.transformers_utils.configs import (ChatGLMConfig, DbrxConfig,
                                              EAGLEConfig, ExaoneConfig,
                                              GraniteConfig, InternVLChatConfig,
                                              JAISConfig, MedusaConfig,
-                                             MllamaConfig, MLPSpeculatorConfig,
+                                            #  MllamaConfig, 
+                                             MLPSpeculatorConfig,
                                              MPTConfig, NemotronConfig,
                                              RWConfig, SolarConfig,
                                              UltravoxConfig)
@@ -39,7 +40,7 @@ MISTRAL_CONFIG_NAME = "params.json"
 logger = init_logger(__name__)
 
 _CONFIG_REGISTRY_OVERRIDE_HF: Dict[str, Type[PretrainedConfig]] = {
-    "mllama": MllamaConfig
+    # "mllama": MllamaConfig
 }
 
 _CONFIG_REGISTRY: Dict[str, Type[PretrainedConfig]] = {

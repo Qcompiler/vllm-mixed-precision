@@ -17,7 +17,7 @@ sampling_params = SamplingParams(temperature=0.8, top_p=0.95,max_tokens=128)
 import os
 
 # please use Qcompiler to quant model !
-model = "chatglm3-6b"
+model = "falcon-7b"
 base =  "/home/chenyidong/data/mixqdata"
 os.system("rm " + model + "/*.safetensors")
 # 删除量化后的tonken chatglm https://github.com/THUDM/ChatGLM3/issues/152

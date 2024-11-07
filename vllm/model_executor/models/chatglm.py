@@ -149,6 +149,7 @@ class GLMMLP(nn.Module):
             config.hidden_size,
             bias=config.add_bias_linear,
             quant_config=quant_config,
+            prefix= "down"
         )
 
     def forward(self, hidden_states):

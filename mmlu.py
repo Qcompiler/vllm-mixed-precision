@@ -173,7 +173,10 @@ def evaluate(args, subject, pipeline, dev_df, test_df):
             prompt = train_prompt + prompt_end
 
         label = test_df.iloc[i, test_df.shape[1] - 1]
+        #print(prompt)
         pred = pipeline(prompt)
+        #print(pred)
+        #exit()
 
         probs = [0 for _ in get_choices()]
         cor = pred.strip().startswith(label)
@@ -564,10 +567,8 @@ def main():
         for subcat in subcat_lists
     }
     cat_cors = {cat: [] for cat in get_categories()}
-    if args.engine_dir is not None:
-        model_name, model_version = read_model_name(args.engine_dir)
-    else:
-        model_name, model_version = read_model_name_(args.hf_model_dir)
+    assert args.engine_dir is   None 
+    model_name, model_version = read_model_name_(args.hf_model_dir)
     tokenizer, pad_id, end_id = load_tokenizer(
         tokenizer_dir=args.tokenizer_dir,
         vocab_file=args.vocab_file,
@@ -585,13 +586,13 @@ def main():
     safetensors = False
 
     
-    if model_type == 'mix8' :
+    if model_type == 'mixq8' :
 
          
         os.system("rm " + args.hf_model_dir + "/*.safetensors")
         model = LLM(model=args.hf_model_dir, trust_remote_code=True,
                 quantization="MixQ8bit")
-    if model_type == 'mix4':
+    if model_type == 'mixq4':
          
         os.system("rm " + args.hf_model_dir + "/*.safetensors")
         model = LLM(model=args.hf_model_dir, trust_remote_code=True,
@@ -601,25 +602,19 @@ def main():
         import warnings
  
         warnings.filterwarnings('ignore')
-        import awq
-        from awq import AutoAWQForCausalLM
+ 
         print(f" -- Loading model awq...")
-        model = AutoAWQForCausalLM.from_quantized(
-            model_path, quant_file, fuse_layers=True,
-            safetensors=safetensors
-        )
-        model = model.to('cuda')
+        model   =LLM(model=args.hf_model_dir, trust_remote_code=True,
+                quantization="AWQ")
 
-
-    if model_type == 'bitsandbytes':
-        from transformers import AutoModelForCausalLM
-        model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        torch_dtype=torch.float16,
-        load_in_8bit=True,
-        trust_remote_code=True,
-        max_memory=f'{int(torch.cuda.mem_get_info()[0]/1024**3)-2}GB')
-
+    if model_type == 'GPTQ':
+        import warnings
+ 
+        warnings.filterwarnings('ignore')
+ 
+        print(f" -- Loading model awq...")
+        model   =LLM(model=args.hf_model_dir, trust_remote_code=True,
+                quantization="GPTQ") 
 
     if model_type == 'fp16': 
         model = LLM(model=args.hf_model_dir, trust_remote_code=True)
@@ -629,7 +624,9 @@ def main():
     pipeline = Pipeline(tokenizer, model, model_name, pad_id, end_id,
                         args.max_attention_window_size)
 
+    i = 0
     for subject in tqdm(subjects):
+        i += 1
         dev_df = pd.read_csv(os.path.join(args.data_dir, "dev",
                                           subject + "_dev.csv"),
                              header=None)[:args.ntrain]
@@ -645,17 +642,27 @@ def main():
                 if subcat in get_categories()[key]:
                     cat_cors[key].append(cors)
         all_cors.append(cors)
+        # if i > 1:
+        #     break
+
+    file_name = args.hf_model_dir.split("/")[-1] + "_" + args.model_type + ".csv"
+    f = open("/home/chenyidong/output/" + file_name, "a+")
 
     for subcat in subcat_cors:
-        subcat_acc = np.mean(np.concatenate(subcat_cors[subcat]))
+        subcat_acc = np.mean((np.concatenate(subcat_cors[subcat])))
         print("Average accuracy {:.3f} - {}".format(subcat_acc, subcat))
+        f.writelines([("Average accuracy {:.3f} - {}\n".format(subcat_acc, subcat))])
 
     for cat in cat_cors:
         cat_acc = np.mean(np.concatenate(cat_cors[cat]))
         print("Average accuracy {:.3f} - {}".format(cat_acc, cat))
+        f.writelines(("Average accuracy {:.3f} - {}\n".format(cat_acc, cat)))
+
 
     weighted_acc = np.mean(np.concatenate(all_cors))
     print("Average accuracy: {:.3f}".format(weighted_acc))
+    f.writelines("Average accuracy {:.3f} - {}\n".format(cat_acc, cat))
+    f.close()
     if args.check_accuracy:
         assert weighted_acc >= args.accuracy_threshold, f"Expected accuracy >= {args.accuracy_threshold} while got {weighted_acc}"
     return weighted_acc
