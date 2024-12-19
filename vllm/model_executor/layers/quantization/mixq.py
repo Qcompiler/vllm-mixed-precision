@@ -9,7 +9,13 @@ from vllm.model_executor.layers.quantization.base_config import (
     QuantizationConfig)
 from vllm.model_executor.utils import set_weight_attrs
 
+def FindOutliers(Activation, sigma = None):
 
+    if sigma is None:
+        sigma = 10
+    
+    tmp = torch.unique(torch.where((  Activation.abs() > sigma ))[1])
+    return tmp.to(torch.int32)
 class MixQConfig(QuantizationConfig):
     """Config class for MixQ.
 
@@ -57,8 +63,8 @@ class MixQConfig(QuantizationConfig):
     def get_quant_method(
             self, layer: torch.nn.Module, prefix: str) -> Optional["MixQLinearMethod"]:
         if isinstance(layer, LinearBase):
-            print("--get_quant_method---")
-            print(layer.prefix)
+            # print("--get_quant_method---")
+            # print(layer.prefix)
             if layer.prefix is not None and "down" in layer.prefix:
                 return MixQLinearMethod(self, weight_only = True)
             return MixQLinearMethod(self)
@@ -191,7 +197,9 @@ class MixQLinearMethod(LinearMethodBase):
         })
         layer.register_parameter("scale_col", scale_col)
         set_weight_attrs(scale_col, extra_weight_attrs)
-
+        layer.capture = 0
+        layer.n_outliers = 128
+        
     def apply(self,
               layer: torch.nn.Module,
               x: torch.Tensor,
@@ -206,6 +214,19 @@ class MixQLinearMethod(LinearMethodBase):
         N = layer.weight.shape[0]
         K = layer.weight.shape[1]
 
+        apply_capture = True
+        if not layer.capture and apply_capture:
+
+
+            layer.capture = 1
+            local_ind = FindOutliers(inputs)
+            
+            layer.n_outliers = len(local_ind)      
+    
+            # if  layer.n_outliers:
+            #     layer.ind.data = local_ind
+            #     layer.weight_cache.data = layer.weight.data[:, local_ind] *  layer.scale_col.reshape((N, 1))
+            #     layer.weight_cache.data = layer.weight_cache.data.to(torch.float16)
 
         if self.weight_only is True:
 
@@ -222,15 +243,28 @@ class MixQLinearMethod(LinearMethodBase):
         else:
             # for compute bound 
             if M > 64:
-                #print("call  weight act",M,N,K)
-                y1 = mixlib.mixgemmforward(M,N,K,
-                                    x,
-                                    layer.weight, 
-                                    layer.scale_col,
-                                    layer.weight_cache, #新增fp weight 
-                                    layer.ind, #新增fp ind 
-                                    layer.q_weight, #新增 int4 weight int32
-                                    layer.q_scale_col)
+
+                if layer.n_outliers == 0:
+                    #print("no outliers!")
+
+        
+                    y1 = mixlib.mixgemmforward_direct(M,N,K,
+                                        x,
+                                        layer.weight, 
+                                        layer.scale_col)
+
+
+                else:
+
+                    #print("call  weight act",M,N,K)
+                    y1 = mixlib.mixgemmforward(M,N,K,
+                                        x,
+                                        layer.weight, 
+                                        layer.scale_col,
+                                        layer.weight_cache, #新增fp weight 
+                                        layer.ind, #新增fp ind 
+                                        layer.q_weight, #新增 int4 weight int32
+                                        layer.q_scale_col)
             else:
                 
                 #print("call  weight only",M,N,K)
