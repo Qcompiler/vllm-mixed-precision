@@ -228,7 +228,7 @@ class MixQLinearMethod(LinearMethodBase):
             #     layer.weight_cache.data = layer.weight.data[:, local_ind] *  layer.scale_col.reshape((N, 1))
             #     layer.weight_cache.data = layer.weight_cache.data.to(torch.float16)
 
-        if self.weight_only is True:
+        if M < 4 and  self.weight_only is True:
 
             y1 =  w8_a16_gemm(inputs,layer.q_weight,layer.q_scale_col)
             # print('-------------')
@@ -242,7 +242,7 @@ class MixQLinearMethod(LinearMethodBase):
             #     exit()
         else:
             # for compute bound 
-            if M > 64:
+            if M > 4:
 
                 if layer.n_outliers == 0:
                     #print("no outliers!")

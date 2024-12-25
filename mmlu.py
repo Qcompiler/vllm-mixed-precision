@@ -268,6 +268,9 @@ class Pipeline:
             n = self.model.max_input_len
         except:
             n = self.model.llm_engine.model_config.max_seq_len_to_capture
+        print("----------------------")
+        print(n)
+        exit()
         return len(self.tokenizer.encode(prompt)) <= n
 
 
