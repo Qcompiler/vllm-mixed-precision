@@ -10,6 +10,7 @@ from vllm.model_executor.layers.quantization.base_config import (
 from vllm.model_executor.utils import set_weight_attrs
 from vllm.model_executor.layers.quantization.mixq import MixQLinearMethod
 
+import mixgemm
 class MixQ4bitConfig(QuantizationConfig):
     """Config class for MixQ.
 
@@ -48,12 +49,12 @@ class MixQ4bitConfig(QuantizationConfig):
         ]
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]) -> "MixQConfig":
-        weight_bits = cls.get_from_keys(config, ["w_bit", "bits"])
+    def from_config(cls, config: Dict[str, Any])  :
+        weight_bits = 4
         group_size = cls.get_from_keys(config, ["q_group_size", "group_size"])
-        print("mix------weight")
-        print(weight_bits)
-        print(group_size)
+        # print("mix------weight")
+        # print(weight_bits)
+        # print(group_size)
         return cls(weight_bits, group_size)
 
     def get_quant_method(
@@ -61,10 +62,10 @@ class MixQ4bitConfig(QuantizationConfig):
             ) -> Optional["MixQLinear4bitMethod"]:
         if isinstance(layer, LinearBase):
             #print("--get_quant_method---")
-            #print(layer.name)
-            if layer.name is not None and "down" in layer.name:
+            # print(layer.prefix)
+            if layer.prefix is not None and "down" in layer.prefix:
                 #print("use 8bit!")
-                return MixQLinearMethod(self, weight_only = True)
+                return MixQLinearMethod(self)
             return MixQLinear4bitMethod(self)
         return None
 
@@ -166,55 +167,55 @@ class MixQLinear4bitMethod(LinearMethodBase):
         set_weight_attrs(scale_col, extra_weight_attrs)
 
  
-        qweight = Parameter(
+        q_weight = Parameter(
             torch.empty(
-                input_size_per_partition,
-                output_size_per_partition // self.quant_config.pack_factor,
+                output_size_per_partition ,
+                input_size_per_partition // self.quant_config.pack_factor,
                 dtype=torch.int32,
             ),
             requires_grad=False,
         )
         set_weight_attrs(
-            qweight, {
-                "input_dim": 0,
-                "output_dim": 1,
+            q_weight, {
+                "input_dim": 1,
+                "output_dim": 0,
                 "packed_dim": 1,
                 "pack_factor": self.quant_config.pack_factor,
             })
-        qzeros = Parameter(
+        # q_scale_col = Parameter(
+        #     torch.empty(
+        #         input_size_per_partition // self.quant_config.group_size,
+        #         output_size_per_partition // self.quant_config.pack_factor,
+        #         dtype=torch.int32,
+        #     ),
+        #     requires_grad=False,
+        # )
+        # set_weight_attrs(
+        #     q_scale_col, {
+        #         "input_dim": 0,
+        #         "output_dim": 1,
+        #         "packed_dim": 1,
+        #         "pack_factor": self.quant_config.pack_factor,
+        #     })
+        q_scale_col = Parameter(
             torch.empty(
-                input_size_per_partition // self.quant_config.group_size,
-                output_size_per_partition // self.quant_config.pack_factor,
-                dtype=torch.int32,
-            ),
-            requires_grad=False,
-        )
-        set_weight_attrs(
-            qzeros, {
-                "input_dim": 0,
-                "output_dim": 1,
-                "packed_dim": 1,
-                "pack_factor": self.quant_config.pack_factor,
-            })
-        scales = Parameter(
-            torch.empty(
-                input_size_per_partition // self.quant_config.group_size,
+                1,
                 output_size_per_partition,
                 dtype=params_dtype,
             ),
             requires_grad=False,
         )
-        set_weight_attrs(scales, {
+        set_weight_attrs(q_scale_col, {
             "input_dim": 0,
             "output_dim": 1,
         })
 
-        layer.register_parameter("qweight", qweight)
-        layer.register_parameter("scales", scales)
-        layer.register_parameter("qzeros", qzeros)
-        set_weight_attrs(qweight, extra_weight_attrs)
-        set_weight_attrs(scales, extra_weight_attrs)
-        set_weight_attrs(qzeros, extra_weight_attrs)
+        layer.register_parameter("q_weight", q_weight)
+        layer.register_parameter("q_scale_col", q_scale_col)
+        # layer.register_parameter("qzeros", qzeros)
+        set_weight_attrs(q_weight, extra_weight_attrs)
+        set_weight_attrs(q_scale_col, extra_weight_attrs)
+        # set_weight_attrs(qzeros, extra_weight_attrs)
         # self.quant_config.group_size = 128
 
         # output_size_per_partition = sum(output_partition_sizes)
@@ -223,9 +224,9 @@ class MixQLinear4bitMethod(LinearMethodBase):
         #         "The output size is not aligned with the quantized "
         #         "weight shape. This can be caused by too large "
         #         "tensor parallel size.")
-
- 
-
+        layer.init = False
+        layer.weight_cache2 = torch.clone(weight_cache.data)
+        layer.out = torch.zeros((1, output_size_per_partition), dtype=torch.half, device=weight_cache.data.device)
 
     def apply(self,
               layer: torch.nn.Module,
@@ -236,28 +237,64 @@ class MixQLinear4bitMethod(LinearMethodBase):
         shape = x.shape[:-1] + (layer.weight.shape[0], )
 
 
-        inputs = x.reshape(-1, x.shape[-1])
+        inputs = torch.clone(x.reshape(-1, x.shape[-1]))
+ 
         M =  inputs.shape[0]
         N = layer.weight.shape[0]
         K = inputs.shape[1]
- 
-        if M > 32:
 
+        # print("call 4 bit mix")
+        # print(x.shape,end="")
+        # print(layer.weight.shape)
+        # if  torch.isnan(torch.abs(torch.sum(inputs[0:1024]))) :
+            
+            
+        #     print("mixq 4 torch.isnan(torch.abs(torch.sum(inputs[0:1024])))")
+        #     print(torch.sum(inputs[0:1024]))
+        if  layer.init is False:
+            layer.weight_cache2 = layer.weight_cache.data / layer.q_scale_col.T
+            layer.q_scale_col.data  = layer.q_scale_col.data.to(torch.float32)
+            layer.init = True                
+
+        #     exit()
+        if M > 1:
+            
             y1 = mixlib.mixgemmforward4bit(M,N,K,
-                                x,
+                                inputs,
                                 layer.weight, 
                                 layer.scale_col,
                                 layer.weight_cache, #新增fp weight 
                                 layer.ind, #新增fp ind 
-                                layer.qweight, #新增 int4 weight int32
-                                layer.scales)
+                                layer.q_weight, #新增 int4 weight int32
+                                layer.q_scale_col)
+            #print("output is ")
+            # if  torch.isnan(torch.abs(torch.sum(inputs[0:1024]))) :
+            #     print(x.shape)
+            #     print(layer.weight.shape)
+            #     print("sum == 0")
+            #     print(x)
+                 
+                 
+
+            #     print(y1[0:3,0:3])
+            #     exit()
+
+            # if torch.isnan(y1[0,0]) :
+            #     print(x.shape)
+            #     print("find nan")
+            #     print(x[0,100])
+            #     print(torch.abs(torch.sum(x[0:1024])))
+            #     # print(x)
+            #     # print(x_pre)
+            #     # print(x_pre.shape)
+
+            #     print(y1[0:3,0:3])
+            #     exit()
+            #  exit()
         else:
-            qweight = layer.qweight
-            scales = layer.scales
-            qzeros = layer.qzeros
-            pack_factor = 8
-            out_shape = (x.shape[:-1] + (qweight.shape[-1] * pack_factor, ))
-            reshaped_x = x.reshape(-1, x.shape[-1])
+            qweight = layer.q_weight
+
+            # out_shape = (x.shape[:-1] + (qweight.shape[-1] * pack_factor, ))
 
             # num_tokens >= threshold
             # FP16_MATMUL_HEURISTIC_CONDITION = x.shape[:-1].numel() >= 256
@@ -266,17 +303,57 @@ class MixQLinear4bitMethod(LinearMethodBase):
             #     out = ops.awq_dequantize(qweight, scales, qzeros, 0, 0, 0)
             #     out = torch.matmul(reshaped_x, out)
             # else:
-        
+
+                
+            
+
+            # print(B_[0:4,0:4])
+            # print(s_[0:3])
+            # exit()
+            # mixgemm.gemv_int4_fp16(m, n, k, A, B_, C_i4, 32, 4, s_.to(torch.float32),weight_cache, ind, n_outliers)
+
+            mixgemm.gemv_int4_fp16(M, N, K, inputs, layer.q_weight,
+                                   layer.out, 64, 4, 
+                                   layer.q_scale_col,
+                                   layer.weight_cache2, layer.ind, 
+                                   128)
+            # print(layer.q_scale_col)
+            # exit()
+            # mixgemm.gemv_int4(M, N, K, inputs, layer.q_weight,
+            #                        out, 64, 4, 
+            #                        layer.q_scale_col)
+
+            # out = torch.mm(inputs[:,layer.ind], layer.weight_cache.T)
+            # grand =   mixlib.mixgemmforward4bit(M,N,K,
+            #                     inputs,
+            #                     layer.weight, 
+            #                     layer.scale_col,
+            #                     layer.weight_cache, #新增fp weight 
+            #                     layer.ind, #新增fp ind 
+            #                     layer.q_weight, #新增 int4 weight int32
+            #                     layer.q_scale_col)
+             
+            # err  =(out-grand).abs().max()
+            # if err > 0.1:
+            #     print(M)
+            #     print(N)
+            #     print(K)
+            #     print((out-grand).abs().max())
+            #     print(out)
+            #     print(grand)
+            #     exit()
+             
             #print(reshaped_x.shape)
-            out = ops.awq_gemm(reshaped_x, qweight, scales, qzeros,
-                            pack_factor)
+            # out = ops.awq_gemm(reshaped_x, qweight, scales, qzeros,
+            #                 pack_factor)
             if bias is not None:
-                out.add_(bias)
-            return out.reshape(out_shape)
+                layer.out.add_(bias)
+            return layer.out.reshape(shape)
         if layer.bias is not None:
             y1 += layer.bias
 
         
+        # print(y1)
         return y1.reshape(shape)
         
         

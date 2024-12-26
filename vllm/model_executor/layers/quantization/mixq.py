@@ -8,7 +8,8 @@ from vllm.model_executor.layers.linear import LinearBase, LinearMethodBase
 from vllm.model_executor.layers.quantization.base_config import (
     QuantizationConfig)
 from vllm.model_executor.utils import set_weight_attrs
-
+# from mixlib import w8_a16_gemm_forward_torch
+from EETQ import w8_a16_gemm 
 def FindOutliers(Activation, sigma = None):
 
     if sigma is None:
@@ -213,7 +214,19 @@ class MixQLinearMethod(LinearMethodBase):
         M =  inputs.shape[0]
         N = layer.weight.shape[0]
         K = layer.weight.shape[1]
+        # print("call 8 bit mix")
+        # print(x.shape,end="")
+        # print(layer.weight.shape)
 
+        # if  torch.isnan(torch.abs(torch.sum(inputs[0:1024]))) :
+        #     print(x.shape)
+        #     print(layer.weight.shape)
+        #     print("torch.isnan(torch.abs(torch.sum(inputs[0:1024])))")
+        #     print(torch.sum(inputs[0:1024]))
+                
+
+        #     exit()
+            
         apply_capture = True
         if not layer.capture and apply_capture:
 
@@ -228,9 +241,10 @@ class MixQLinearMethod(LinearMethodBase):
             #     layer.weight_cache.data = layer.weight.data[:, local_ind] *  layer.scale_col.reshape((N, 1))
             #     layer.weight_cache.data = layer.weight_cache.data.to(torch.float16)
 
-        if M < 4 and  self.weight_only is True:
+        if    self.weight_only is True:
 
-            y1 =  w8_a16_gemm(inputs,layer.q_weight,layer.q_scale_col)
+            # y1 =  w8_a16_gemm(inputs,layer.q_weight,layer.q_scale_col)
+            y1 = w8_a16_gemm(inputs,layer.q_weight,layer.q_scale_col)
             # print('-------------')
             # print(inputs)
             # print(layer.q_weight)
@@ -242,7 +256,7 @@ class MixQLinearMethod(LinearMethodBase):
             #     exit()
         else:
             # for compute bound 
-            if M > 4:
+            if M > 32:
 
                 if layer.n_outliers == 0:
                     #print("no outliers!")
@@ -275,10 +289,18 @@ class MixQLinearMethod(LinearMethodBase):
         if layer.bias is not None:
             y1 += layer.bias
 
-        
+        # if  torch.isnan(torch.abs(torch.sum(x[0:1024]))) :
+        #     print("sum == 0")
+        #     print(x)
+                
+                
+
+        #     print(y1[0:3,0:3])
+        #     exit()
         # #print(self.ind.shape[0])
-        # # print("grand is ")
-        # # print(y1)
+        #print("grand is ")
+        #print(y1[0:3,0:3])
+        #exit()
         # # print("EETQ is ")
         # # print(y2)
         
@@ -297,6 +319,8 @@ class MixQLinearMethod(LinearMethodBase):
         #     exit(0)
             
         #exit(0)
+        # if M < 1024:
+        #     print(y1)
         return y1.reshape(shape)
         
         
