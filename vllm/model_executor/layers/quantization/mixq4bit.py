@@ -62,9 +62,9 @@ class MixQ4bitConfig(QuantizationConfig):
             ) -> Optional["MixQLinear4bitMethod"]:
         if isinstance(layer, LinearBase):
             #print("--get_quant_method---")
-            # print(layer.prefix)
+            print(layer.prefix)
             if layer.prefix is not None and "down" in layer.prefix:
-                #print("use 8bit!")
+                print("use 8bit!")
                 return MixQLinearMethod(self)
             return MixQLinear4bitMethod(self)
         return None
@@ -96,7 +96,10 @@ class MixQLinear4bitMethod(LinearMethodBase):
 
         output_size_per_partition = sum(output_partition_sizes)
 
- 
+        print(input_size_per_partition)
+        print(output_partition_sizes)
+        print("4bit")
+        
 
         weight = Parameter(
             torch.empty(
@@ -267,85 +270,13 @@ class MixQLinear4bitMethod(LinearMethodBase):
                                 layer.ind, #新增fp ind 
                                 layer.q_weight, #新增 int4 weight int32
                                 layer.q_scale_col)
-            #print("output is ")
-            # if  torch.isnan(torch.abs(torch.sum(inputs[0:1024]))) :
-            #     print(x.shape)
-            #     print(layer.weight.shape)
-            #     print("sum == 0")
-            #     print(x)
-                 
-                 
-
-            #     print(y1[0:3,0:3])
-            #     exit()
-
-            # if torch.isnan(y1[0,0]) :
-            #     print(x.shape)
-            #     print("find nan")
-            #     print(x[0,100])
-            #     print(torch.abs(torch.sum(x[0:1024])))
-            #     # print(x)
-            #     # print(x_pre)
-            #     # print(x_pre.shape)
-
-            #     print(y1[0:3,0:3])
-            #     exit()
-            #  exit()
         else:
             qweight = layer.q_weight
-
-            # out_shape = (x.shape[:-1] + (qweight.shape[-1] * pack_factor, ))
-
-            # num_tokens >= threshold
-            # FP16_MATMUL_HEURISTIC_CONDITION = x.shape[:-1].numel() >= 256
-
-            # if FP16_MATMUL_HEURISTIC_CONDITION:
-            #     out = ops.awq_dequantize(qweight, scales, qzeros, 0, 0, 0)
-            #     out = torch.matmul(reshaped_x, out)
-            # else:
-
-                
-            
-
-            # print(B_[0:4,0:4])
-            # print(s_[0:3])
-            # exit()
-            # mixgemm.gemv_int4_fp16(m, n, k, A, B_, C_i4, 32, 4, s_.to(torch.float32),weight_cache, ind, n_outliers)
-
-            mixgemm.gemv_int4_fp16(M, N, K, inputs, layer.q_weight,
+            mixgemm.gemv_int4_fp16_mix(M, N, K, inputs, layer.q_weight,
                                    layer.out, 64, 4, 
                                    layer.q_scale_col,
                                    layer.weight_cache2, layer.ind, 
                                    128)
-            # print(layer.q_scale_col)
-            # exit()
-            # mixgemm.gemv_int4(M, N, K, inputs, layer.q_weight,
-            #                        out, 64, 4, 
-            #                        layer.q_scale_col)
-
-            # out = torch.mm(inputs[:,layer.ind], layer.weight_cache.T)
-            # grand =   mixlib.mixgemmforward4bit(M,N,K,
-            #                     inputs,
-            #                     layer.weight, 
-            #                     layer.scale_col,
-            #                     layer.weight_cache, #新增fp weight 
-            #                     layer.ind, #新增fp ind 
-            #                     layer.q_weight, #新增 int4 weight int32
-            #                     layer.q_scale_col)
-             
-            # err  =(out-grand).abs().max()
-            # if err > 0.1:
-            #     print(M)
-            #     print(N)
-            #     print(K)
-            #     print((out-grand).abs().max())
-            #     print(out)
-            #     print(grand)
-            #     exit()
-             
-            #print(reshaped_x.shape)
-            # out = ops.awq_gemm(reshaped_x, qweight, scales, qzeros,
-            #                 pack_factor)
             if bias is not None:
                 layer.out.add_(bias)
             return layer.out.reshape(shape)

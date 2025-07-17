@@ -65,11 +65,12 @@ class Qwen2MLP(nn.Module):
         self.gate_up_proj = MergedColumnParallelLinear(
             hidden_size, [intermediate_size] * 2,
             bias=False,
-            quant_config=quant_config)
+            quant_config=quant_config, prefix = "gate_up")
         self.down_proj = RowParallelLinear(intermediate_size,
                                            hidden_size,
                                            bias=False,
-                                           quant_config=quant_config)
+                                           quant_config=quant_config,
+                                           prefix = "down")
         if hidden_act != "silu":
             raise ValueError(f"Unsupported activation: {hidden_act}. "
                              "Only silu is supported for now.")
@@ -122,12 +123,14 @@ class Qwen2Attention(nn.Module):
             self.total_num_kv_heads,
             bias=True,
             quant_config=quant_config,
+            prefix= "qkv_proj"
         )
         self.o_proj = RowParallelLinear(
             self.total_num_heads * self.head_dim,
             hidden_size,
             bias=False,
             quant_config=quant_config,
+            prefix= "o_proj"
         )
 
         self.rotary_emb = get_rope(

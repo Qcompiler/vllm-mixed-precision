@@ -110,7 +110,9 @@ class MixQLinearMethod(LinearMethodBase):
         #print(input_size_per_partition)
         #print(output_size_per_partition)
 
-  
+        print(input_size_per_partition)
+        print(output_partition_sizes)
+        print("8bit!!!!")  
         weight = Parameter(
             torch.empty(
                 output_size_per_partition,
